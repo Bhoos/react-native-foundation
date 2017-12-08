@@ -1,0 +1,45 @@
+// Search for projects with native dependencies and include them
+def jsonFile = new File(rootProject.projectDir, '../package.json')
+def parsedJson = new groovy.json.JsonSlurper().parseText(jsonFile.text)
+
+def nativeDependencies = [:]
+
+parsedJson.dependencies.each { key, value ->
+    // Ignore the react and react-native dependencies
+    if (key.equals('react') || key.equals('react-native')) {
+        return
+    }
+
+    // See if there is folder named 'android' within node_modules of the dependency
+    def folder = new File(rootProject.projectDir, '../node_modules/' + key + '/android')
+    if (folder.exists()) {
+        def info = [:]
+
+        info.put('version', value)
+
+        // find out the react package name
+        def manifest = new XmlParser().parse(new File(folder, 'src/main/AndroidManifest.xml'))
+
+        info.put('pkg', manifest.@package)
+        def pkgPath = manifest.@package.replaceAll('\\.', '/')
+
+        def pkgFolder = new File(folder, 'src/main/java/' + pkgPath)
+
+        def reactPkgs = []
+        // Search for java files within the package folder and find the one/more that extends ReactPackage
+        def files = pkgFolder.listFiles({ d, f -> f ==~ /.*.java/ } as FilenameFilter)
+        files.each { f ->
+            def className = f.name[0..<f.name.lastIndexOf('.')]
+            def classDef = ~/(?s).*public\s+class\s+${className}\s+implements\s+ReactPackage.*/
+            if (f.getText() ==~ classDef) {
+                reactPkgs.add(className)
+            }
+        }
+
+        info.put('reactPkgs', reactPkgs)
+        nativeDependencies.put(key, info)
+    }
+}
+
+
+ext.nativeDependencies = nativeDependencies

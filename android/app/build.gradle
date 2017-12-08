@@ -77,6 +77,20 @@ project.ext.react = [
 ]
 
 apply from: "../../node_modules/react-native/react.gradle"
+apply from: "../foundation.gradle"
+
+// Generate the reactPackages array from the nativeDependencies which
+// is pass through buildConfigField below
+def reactPackages = "{"
+nativeDependencies.each{ key, value ->
+    value.reactPkgs.each{ className ->
+        if (reactPackages.length() > 1) {
+            reactPackages += ","
+        }
+        reactPackages += "\"${value.pkg}.${className}\""
+    }
+}
+reactPackages += "}"
 
 /**
  * Set this to true to create two separate APKs instead of one:
@@ -116,6 +130,9 @@ android {
         }
     }
     buildTypes {
+        all {
+            buildConfigField("String[]", "REACT_PACKAGES", reactPackages)
+        }
         release {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -140,6 +157,10 @@ dependencies {
     compile fileTree(dir: "libs", include: ["*.jar"])
     compile "com.android.support:appcompat-v7:23.0.1"
     compile "com.facebook.react:react-native:+"  // From node_modules
+
+    nativeDependencies.each{ key, value ->
+        compile project(':' + key)
+    }
 }
 
 // Run this once to be able to run the application with BUCK
